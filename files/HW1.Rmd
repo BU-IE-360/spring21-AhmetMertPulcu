@@ -1,0 +1,118 @@
+---
+title: "HW1"
+author: "Ahmet Mert Pulçu"
+date: "18 04 2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r,warning=FALSE,echo=FALSE,eval=TRUE,results="hide", message=FALSE}
+setwd("/Users/Pulcu/Desktop/IE 360/HW1")
+library(readxl)
+library(EVDS)
+set_evds_key("E8bUyU1EN1")
+library(EVDS)
+library(zoo)
+library(lubridate)
+library(tidyverse)
+```
+
+# **Inspection of Three Different Data Series**
+
+## Part A:
+
+I examined three different time series data provided by
+[https://evds2.tcmb.gov.tr/](https://evds2.tcmb.gov.tr/)
+These data series are:
+
++ USD Exchange Rate(buying)
++ House Unit Prices(TL/sq(m))
++ CPI for Alcoholic Beverages and Tobacco
+
+I think the CPI for alcoholic beverages and tobacco is strongly related to dollar exchange rate since there are many imported products among alcoholic beverages and tobacco. Also, I think house unit prices might be related to dollar exchange rate, because dollar exchange is a significant factor in determining economic welfare in Turkey and house prices are related to economic welfare. After visualizing these three data series, it will be easier to make comments about the relationship between these three data sets.
+
+### USD Exchange Rate
+```{r}
+dolar_rate <- read_excel("dolar_rate.xlsx")
+dolar_rate$Tarih <- as.yearmon(dolar_rate$Tarih)
+dolar_rate
+```
+```{r}
+plot(dolar_rate$Tarih,dolar_rate$Dolar_Rate, type = "l",xlab = "Date",ylab = "USD Exchange Rate", main = "USD Exchange Rate")
+```
+
+This graph shows the monthly USD Exchange Rate from February 2018 to February 2021. Even though there are months in which dollar rate decreases, it is crystal clear that dollar rate has an increasing trend over the years. The underlying reason of this increasing USD exchange rate is mainly the actions of government. The actions and decisions of the government might create unreliable economical environment for the investors.
+
+### House Unit Prices
+```{r}
+Housing_Unit_Prices <- read_excel("Housing_Unit_Prices.xlsx")
+Housing_Unit_Prices$Tarih <- as.yearmon(Housing_Unit_Prices$Tarih)
+Housing_Unit_Prices
+
+```
+```{r}
+plot(Housing_Unit_Prices$Tarih,Housing_Unit_Prices$Housing_Unit_Price, type = "l",xlab = "Date",ylab = "Housing Unit Prices(TL/m2)", main = "Housing Unit Prices")
+```
+
+This graph displays the monthly Housing Unit Prices from February 2018 to February 2021. There is a general increase in unit prices. However, there is a drastic growth in the increase rate since the first months of 2020. Covid-19 Pandemic might have an impact on that growth due to the fact that the time of the first encounter with the virus matches the time of the growth in the increase. Considering the economic difficulties came along with the pandemic, this might be a reasonable assumption.
+
+### Consumer Price Index for Alcoholic Beverages and Tobacco
+```{r}
+cpi <- read_excel("cpi_alcohol.xlsx")
+cpi$Tarih <- as.yearmon(cpi$Tarih)
+cpi
+```
+```{r}
+plot(cpi$Tarih,cpi$cpi,type = "l",xlab = "Date",ylab = "CPI", main = "Consumer Price Index for Alcoholic Beverages and Tobacco")
+```
+
+This is the monthly consumer price index for alcoholic beverages and tobacco from February 2018 to February 2021. This data series has an upward trend over the years. However, we can easily notice that during 2019, the increase rate goes sky high. The first major increase between March 2019 and May 2019 might be related to dollar rate since highest dollar rate in 2019 is in May. In addition, the taxes imposed by government has an impact on the increasing prices of the alcoholic beverages and tobacco products. 
+
+### Conclusion
+
+We can say that CPI and Housing unit Prices are correlated to USD exchange rate, since both of them increases with the increasing USD exchange rate.
+
+## Part B:
+
+In this part, I investigated particular search datas provided by [Google Trends](https://trends.google.com/)
+I examined these search datas:
+
++ search of "dolar" for the USD Exchange Rate data
++ search of "satılık ev" for the Housing Unit Prices data
++ search of "Efes Pilsen" for the CPI for the alcoholic beverages and tobacco data
+
+```{r}
+dolartrends <- read.csv("dolartrends.csv",header = TRUE)
+dolartrends <- read.csv("dolartrends.csv",header = TRUE) %>% mutate(Date = ymd(dolartrends$Hafta))
+plot(dolartrends$Date,dolartrends$dolar,type="l",xlab="Date",ylab="number of searches",main="Search Data of dolar")
+```
+```{r,echo=FALSE}
+plot(dolar_rate$Tarih,dolar_rate$Dolar_Rate, type = "l",xlab = "Date",ylab = "USD Exchange Rate", main = "USD Exchange Rate")
+```
+As we can see, whenever USD Exchange Rate reaches a local maximum point, number of searches for the world dolar reaches a maximum point too.
+
+```{r}
+emlak <- read.csv("emlak.csv",header = TRUE)
+emlak <- read.csv("emlak.csv",header = TRUE) %>% mutate(Date = ymd(emlak$Hafta))
+plot(emlak$Date,emlak$value,type="l",xlab="Date",ylab="number of searches",main="Search Data of Hürriyet Emlak")
+```
+```{r,echo=FALSE}
+plot(Housing_Unit_Prices$Tarih,Housing_Unit_Prices$Housing_Unit_Price, type = "l",xlab = "Date",ylab = "Housing Unit Prices(TL/m2)", main = "Housing Unit Prices")
+```
+Search volume of Hürriyet Emlak increases in March 2020 when the first encounter with Covid-19 in Turkey occurs. We observed a similar growth in the increase rate of Housing Unit Prices during those months. However, search volume of Hürriyet Emlak generally decreases as Housing Unit Prices increases
+
+
+```{r}
+efes_pilsen <- read.csv("efes_pilsen.csv",header = TRUE)
+efes_pilsen <- read.csv("efes_pilsen.csv",header = TRUE) %>% mutate(Date = ymd(efes_pilsen$Hafta))
+plot(efes_pilsen$Date,efes_pilsen$Efes.Pilsen,type="l",xlab="Date",ylab="number of searches",main="Search Data of Efes Pilsen")
+```
+
+[This](https://trends.google.com/trends/explore?date=2018-02-01%202021-03-01&geo=TR&gprop=froogle&q=%2Fg%2F1q6j1gr02) is the search data of "Efes Pilsen" from Google Shopping section of Google Trends. Frequency of Efes Pilsen searches in the last year is much higher than the search frequencies in 2018 and 2019. We can say that search volume of Efes Pilsen increases as CPI for alcoholic beverages increases. Since Efes is a relatively cheap alcoholic beverage, this assumption makes sense.
+```{r,echo=FALSE}
+plot(cpi$Tarih,cpi$cpi,type = "l",xlab = "Date",ylab = "CPI", main = "Consumer Price Index for Alcoholic Beverages and Tobacco")
+```
+
