@@ -92,6 +92,7 @@ plot(dolartrends$Date,dolartrends$dolar,type="l",xlab="Date",ylab="number of sea
 ```{r,echo=FALSE}
 plot(dolar_rate$Tarih,dolar_rate$Dolar_Rate, type = "l",xlab = "Date",ylab = "USD Exchange Rate", main = "USD Exchange Rate")
 ```
+
 As we can see, whenever USD Exchange Rate reaches a local maximum point, number of searches for the world dolar reaches a maximum point too.
 
 ```{r}
@@ -102,6 +103,7 @@ plot(emlak$Date,emlak$value,type="l",xlab="Date",ylab="number of searches",main=
 ```{r,echo=FALSE}
 plot(Housing_Unit_Prices$Tarih,Housing_Unit_Prices$Housing_Unit_Price, type = "l",xlab = "Date",ylab = "Housing Unit Prices(TL/m2)", main = "Housing Unit Prices")
 ```
+
 Search volume of Hürriyet Emlak increases in March 2020 when the first encounter with Covid-19 in Turkey occurs. We observed a similar growth in the increase rate of Housing Unit Prices during those months. However, search volume of Hürriyet Emlak generally decreases as Housing Unit Prices increases
 
 
