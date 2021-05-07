@@ -1,0 +1,168 @@
+---
+title: "Homework2"
+author: "Ahmet Mert Pulçu"
+date: "07 05 2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r,warning=FALSE,echo=FALSE,eval=TRUE,results="hide", message=FALSE}
+setwd("/Users/Pulcu/Desktop/IE 360/HW2")
+library(ggplot2)
+library(data.table)
+library(readxl)
+library(lubridate)
+library(forecast)
+library(zoo)
+```
+# **Forecasting House Sales of April 2021**
+## INTRODUCTION
+
+In this homework, I will try to forecast the number of total house sales of April 2021. I will build a time series regression model in order to do this forecasting. The aim is reaching the model which has residuals with zero mean and constant variance. Minimizing autocorrelation is another objective of this study.
+
+## Introducing and Visualizing the Data
+
+I used the data of total house sales, USD exchange rate, and customer confidence index from January 2013 to March 2021. I transformed my data into time series data.
+```{r}
+house_sales_data<-read_excel("house_sales.xlsx")
+house_sales_data<-ts(house_sales_data,frequency = 12,start = c(2013,1))
+head(house_sales_data)
+plot(house_sales_data,xlab="Year")
+house_sales<-data.table(sales=house_sales_data)
+house_sales[,trend:=1:.N]
+head(house_sales)
+ts_reg=lm(sales.house_sales~trend,data=house_sales)
+summary(ts_reg)
+```
+
+The mean residual, R-squared values are not satisfactory. Therefore we need to introduce other predictors to our model as well.
+```{r}
+house_sales[,trend_constant:=predict(ts_reg,house_sales)]
+ ggplot(house_sales ,aes(x=trend)) +
+ geom_line(aes(y=sales.house_sales,color='real')) + 
+ geom_line(aes(y=trend_constant,color='trend')) + labs(title = "Total House Sales", x = "Time",y = "Sales")
+```
+
+Trend data is not sufficient to explain the fluctuations beginning at 2019.
+
+## Adding Predictors
+
+I will use month,interest rate for housing loans, and financial situation of the household data as predictors. I am adding those data to my house sales data.
+```{r,warning=FALSE}
+
+month<-seq(1,12,by=1)
+financial_st<-read_excel("financial_st.xlsx")
+interest_housing<-read_excel("interest_housing.xlsx")
+interest_housing<-data.table(interest_housing)
+financial_st<-data.table(financial_st)
+house_sales<-cbind(house_sales,month,interest_housing,financial_st)
+house_sales$Date<-as.yearmon(house_sales$Date)
+head(house_sales)
+```
+
+# Regression Analysis
+
+## Seasonality Analysis
+```{r}
+fit<-lm(sales.house_sales~trend+as.factor(month),data = house_sales)
+summary(fit)
+checkresiduals(fit,lag = 12)
+```
+
+It can be said that there is seasonality effect. The effects of the months close to the end of the year have a relatively strong effect on total house sales. However, when we look at R-squared values and the residual standard errors, we see that they are not satisfactory.
+
+## Interest Rates on Housing Loans
+```{r}
+fit<-lm(sales.house_sales~trend+as.factor(month)+interest_housing,data= house_sales)
+summary(fit)
+checkresiduals(fit,lag=12)
+```
+
+Interest rates have a significant effect in this model. ALthough there is an increase in R-squared values,it is still low.
+```{r}
+house_sales[,trend_constant_interest:=predict(fit,house_sales)]
+
+ggplot(house_sales ,aes(x=Date)) +
+ geom_line(aes(y=sales.house_sales,color='real')) + 
+ geom_line(aes(y=trend_constant_interest,color='trend')) + labs(title = "Total House Sales", x = "Time",y = "Sales")
+
+```
+
+
+## Statement of Financial Situation of Households
+
+```{r}
+fit<-lm(sales.house_sales~trend+as.factor(month)+interest_housing+financial_st,data= house_sales)
+summary(fit)
+checkresiduals(fit,lag=12)
+```
+
+The model shows that there is no significant effect of the data financial_st.
+```{r}
+house_sales[,trend_constant_financial_st:=predict(fit,house_sales)]
+
+ggplot(house_sales ,aes(x=Date)) +
+ geom_line(aes(y=sales.house_sales,color='real')) + 
+ geom_line(aes(y=trend_constant_financial_st,color='trend')) + labs(title = "Total House Sales", x = "Time",y = "Sales")
+
+```
+
+## Lagged Variable
+
+```{r}
+house_sales[, residuals:=residuals(fit)]
+house_sales[, lag1:=shift(residuals(fit),1)]
+
+fit=lm(sales.house_sales~trend+as.factor(month)+interest_housing+financial_st+lag1,data = house_sales)
+summary(fit)
+checkresiduals(fit)
+```
+
+Lag1 has high significance in this model. The p-value decreased compared to previous model, and R-squared value increased. When we check residuals, we see autocorrelation between residuals decreased. Although the p-value is increased, it is enough to reject null hypothesis.
+```{r,warning=FALSE}
+house_sales[,trend_lag1:=predict(fit,house_sales)]
+
+ggplot(house_sales ,aes(x=Date)) +
+ geom_line(aes(y=sales.house_sales,color='real')) + 
+ geom_line(aes(y=trend_lag1,color='trend')) + labs(title = "Total House Sales", x = "Time",y = "Sales")
+```
+
+We can see that adding lagged variables made our predictions more accurate.
+```{r,warning=FALSE}
+house_sales %>%
+  ggplot(aes(x=trend_lag1, y=sales.house_sales)) + 
+  geom_point()+
+geom_abline(slope=1, intercept=0)+labs( x = "Prediction", y = "Actual")
+```
+
+Even though, there are some outlier points, most of the points are close to the line.
+
+# Forecasting
+
+```{r}
+house_sales=rbind(house_sales, data.table(Date = as.yearmon("2021-04")),fill=T )
+house_sales[,trend:=1:.N]
+Model<- arima(house_sales$trend_lag1, c(1,0,0))
+forecast1<- predict(Model,n.ahead=1)$pred
+forecastfr<- as.data.frame(forecast1)
+forecastfr<-unlist(forecastfr)
+forecastfr<-as.numeric(forecastfr)
+forecastfr
+house_sales[100,12]<-forecastfr[1]
+
+```
+
+The forecasted total number of houses sold for April 2021 is 109649.
+
+```{r,warning=FALSE}
+ggplot(house_sales ,aes(x=Date)) +
+        geom_line(aes(y=sales.house_sales,color='real')) + 
+        geom_line(aes(y=trend_lag1,color='trend'))+ geom_point(aes(y=trend_lag1), color = "blue", size = 1) + geom_point(aes(y=sales.house_sales), color = "red", size = 1) + labs(title = "Total Number of House Sales", x = "Time", y = "Sales")
+```
+
+# Conclusion
+
+By using trend, month, interest rate on housing loans, and financial situations of households I tried to predict the total number of houses sold for April 2021. My forecast is 109649.
