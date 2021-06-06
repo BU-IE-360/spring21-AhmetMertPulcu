@@ -1,0 +1,222 @@
+---
+title: "Homework3"
+author: "Ahmet Mert Pulçu"
+date: "06 06 2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r,warning=FALSE,echo=FALSE,eval=TRUE,results="hide", message=FALSE}
+setwd("/Users/Pulcu/Desktop/IE 360/HW3")
+library(ggplot2)
+library(data.table)
+library(readxl)
+library(lubridate)
+library(forecast)
+library(zoo)
+library(stringr)
+```
+
+# **Forecasting Hourly Electricity Consumption**
+## INTRODUCTION
+  In this assignment I will try to forecast the hourly electricity consumption for upcoming 24 hours by utilizing the hourly electricity consumption data from 1st of January, 2016 till the 20th of May, 2021. You can access this data from [here](https://seffaflik.epias.com.tr/transparency/tuketim/gerceklesen-tuketim/gercek-zamanli-tuketim.xhtml).
+
+## Preparing Data
+```{r}
+electricity_consumption_data <- read.csv("electricity_consumption.csv")
+electricity_consumption_data<-data.table(electricity_consumption_data)
+electricity_consumption_data
+str(electricity_consumption_data)
+```
+ Now, I will adjust the date, time and consumption amount values.
+```{r}
+adjust_consumption1<-str_remove(electricity_consumption_data$Tüketim.Miktarı..MWh.,"[.]")
+adjust_consumption2<-gsub(",",".",adjust_consumption1)
+electricity_consumption_data[,consumption:=adjust_consumption2]
+electricity_consumption_data$consumption<-as.numeric(electricity_consumption_data$consumption)
+adjust_hour<-gsub(":", ".", electricity_consumption_data$Saat)
+electricity_consumption_data[,Hour:=as.numeric(adjust_hour)]
+electricity_consumption_data[,Date:=as.Date(electricity_consumption_data$Tarih,format="%d.%m.%Y")]
+```
+  
+## Data Decomposition
+
+```{r}
+ggplot(electricity_consumption_data, aes(x=Date, y=consumption)) + geom_line() + geom_point() + ggtitle("Hourly Electricity Consumption")
+```
+  
+  As shown in the graph, we can say that variance seems stable over time. Therefore, I will use additive decomposition. Also seasonality factor can be observed from the graph.
+   Now, I will test whether our data is time series data or not
+```{r}
+is.ts(electricity_consumption_data$consumption)
+```
+  Firstly, I will transform our data into hourly time series data. Then I will decompose it.
+```{r}
+consumption_ts_hourly<-ts(electricity_consumption_data$consumption,frequency=24)
+dec_hourly<-decompose(consumption_ts_hourly,type = "additive")
+plot(dec_hourly)
+```
+ 
+  By looking at our hourly decomposition graphs, we can say that there is no certain increasing or decreasing trend generally. It can be said that random section follows 0 mean generally and variance of random part seems stable although there are some exceptions such as March 27 in 2016.
+  Now, I will make daily decomposition. First I need to find daily consumptions, therefore I will sum up the values of the same day. 
+```{r}
+consumption_daily<-electricity_consumption_data[,list(daily = sum(consumption,na.rm=T)),by=list(Date)]
+acf(consumption_daily$daily)
+```
+  
+  When we use autocorrelation function we can see that there is pattern that repeats itself at every 7 observations. Therefore, it can be said that there is daily seasonality. 
+```{r}
+consumption_ts_daily<-ts(consumption_daily$daily,frequency=7)
+dec_daily<-decompose(consumption_ts_daily,type = "additive")
+plot(dec_daily)
+```
+  
+  Again there is no certain increasing or decreasing trend. Random part mostly follows 0 mean; however, variance seems less stable compared to hourly decomposition data. Seasonal part of the data is difficult to make comments on it.
+  Now, I will make weekly decomposition. But first, I must prepare weekly consumption data. I will start the weeks on Friday since January 1 2016 is Friday.
+```{r}
+consumption_daily[,week:=floor_date(consumption_daily$Date,"week",week_start = 5)]
+consumption_weekly<-consumption_daily[,list(weekly =sum(daily, na.rm=T)), by=list(date(week))]
+consumption_weekly
+```
+```{r}
+consumption_ts_weekly<-ts(consumption_weekly$weekly,frequency=52)
+dec_weekly<-decompose(consumption_ts_weekly,type = "additive")
+plot(dec_weekly)
+```
+  
+  Now we can see seasonal patterns and increasing trend when we look at this plot. When we observe the random part of the plot, we see that there is no constant variance.
+  
+```{r}
+consumption_daily[,month:=floor_date(consumption_daily$Date,"month")]
+consumption_monthly<-consumption_daily[,list(monthly =sum(daily, na.rm=T)), by=list(date(month))]
+head(consumption_monthly)
+```
+```{r}
+consumption_ts_monthly<-ts(consumption_monthly$monthly,frequency=12)
+dec_monthly<-decompose(consumption_ts_monthly,type = "additive")
+plot(dec_monthly)
+```
+  
+  There is an increasing trend and monthly seasonality. Also, variance of the random part seems more stable than our weekly decomposition data. Pandemic beginning in March 2020 might have caused an outlier point in random section of our data.
+  
+## Daily and Hourly Decomposition
+  Now I will create a time series data with frequency 168(24x7). Because I will build a model for forecasting I will separate observations of last 14 days. So, I will use first 46872 observations for my model.
+```{r}
+training_set<-head(electricity_consumption_data$consumption,46872)
+test_set<-tail(electricity_consumption_data$consumption,336)
+ts168<-ts(training_set,frequency=168)
+decomposed168<-decompose(ts168,type = "additive")
+plot(decomposed168)
+```
+  
+  Random part follows 0 mean as usual, and it has a constant variance generally. There is no certain increasing or decreasing trend.
+  
+## Deseasonalization and Detrending Phase
+
+```{r}
+deseasonalized<-ts168-decomposed168$seasonal
+ts.plot(deseasonalized)
+acf(deseasonalized)
+detrend<-deseasonalized-decomposed168$trend
+ts.plot(detrend, xlab = "Time", ylab = "Consumption",main="Deseasonalized and detrended consumption")
+acf(detrend,na.action = na.pass)
+```
+
+## Applying AR models
+
+```{r}
+random<-decomposed168$random
+ar_model1<-arima(random,order = c(1,0,0))
+ar_model2<-arima(random,order = c(2,0,0))
+ar_model3<-arima(random,order = c(3,0,0))
+print(ar_model1)
+print(ar_model2)
+print(ar_model3)
+```
+
+The best AIC value is reached in ar_model3
+
+## Applying MA models
+```{r}
+ma_model1<-arima(random,order = c(0,0,1))
+ma_model2<-arima(random,order = c(0,0,2))
+ma_model3<-arima(random,order = c(0,0,3))
+print(ma_model1)
+print(ma_model2)
+print(ma_model3)
+```
+The best AIC value is reached in ma_model3
+
+## Applyin ARMA models
+  I will test 4 models which are ARIMA(3,0,3), ARIMA(3,0,2), ARIMA(2,0,3),and ARIMA(2,0,2)
+```{r,error=FALSE}
+model1<-arima(random,order = c(3,0,3))
+model2<-arima(random,order = c(3,0,2))
+model3<-arima(random,order = c(2,0,3))
+model4<-arima(random,order = c(2,0,2))
+print(model1)
+print(model2)
+print(model3)
+print(model4)
+```
+  The best AIC value is in model2 which is ARIMA(3,0,2)
+  
+## Forecasting
+
+
+```{r}
+fitted<-random-residuals(model2)+decomposed168$seasonal+decomposed168$trend
+#tail(fitted,90)
+forecast_cons<-predict(model2,n.ahead = 336+84)$pred
+forecast_ts<-ts(forecast_cons,frequency=168,start=c(279,85))
+plot(ts168, ylab = "Electricity Consumption(MWH)",main ="Actual vs Fitted",col="red",xlim=c(277,280))
+points(fitted, type = "l", col = "blue",  xlim=c(277,280))
+```
+
+Reds are actual values and blues are fitted values. I only visualized last part of the data to make it seem more clear. Now let's add trend and seasonality to our forecasted values. 
+```{r}
+trend = tail(decomposed168$trend[!is.na(decomposed168$trend)],1)
+tail(decomposed168$seasonal,1)
+seasonality = decomposed168$seasonal[1:420]
+forecast2 = forecast_ts + trend + seasonality
+plot(ts168, ylab = "Electricity Consumption(MWH)",col = "red",xlim=c(277,282))
+points(fitted, type = "l", col = "blue", xlim=c(277,282))
+points(forecast2, type = "l", col = "black")
+```
+
+Last 336 observations are observations are observations of last 14 days which are to be forecasted. In order to find the error rate I will compare them with my test set.
+```{r}
+last14_forecast<-tail(forecast2,336)
+forecast_table<-data.table(forecasted_values=last14_forecast)
+forecast_table = forecast_table[,actual_values:=test_set]
+datefor = seq(from = as.Date("2017-05-07"), to = as.Date("2017-05-20"), by = 'day')
+hourfor = seq(from = 0, to = 23)
+forecast_table = forecast_table[,date:=rep(datefor,each=24)]
+forecast_table = forecast_table[,hour:=rep(hourfor,14)]
+forecast_table = forecast_table[,datewithhour:=ymd(date)+dhours(hour)]
+daily_table<-forecast_table[,list(daily_value = sum(actual_values,na.rm=T)),by=list(date)]
+a = forecast_table[,list(daily_forecasted = sum(forecasted_values,na.rm=T)),by=list(date)]
+daily_table[,daily_forecasted:=a$daily_forecasted]
+daily_table
+```
+
+Here is daily bias and mape values
+```{r}
+daily_table = daily_table[,bias:=(as.numeric(daily_table$daily_value)-as.numeric(daily_table$daily_forecasted))/24]
+daily_table = daily_table[,mape:=abs(as.numeric(daily_value)-as.numeric(daily_forecasted))/as.numeric(daily_value)/24 * 100]
+daily_table$bias
+daily_table$mape
+```
+
+Here is WMAPE values and mean WMPAE
+```{r}
+WMAPE = sum(abs(as.numeric(daily_table$daily_value)-as.numeric(daily_table$daily_forecasted))/ as.numeric(daily_table$daily_value))* 100 * as.numeric(daily_table$daily_value)/ sum(as.numeric(daily_table$daily_value))
+WMAPE
+mean(WMAPE)
+```
+
+## Conclusion
+
+I tried different decompositions such as hourly,weekly, and monthly. I applied different AR and MA models to my data. I used model2 which is ARIMA(3,0,2) for my forecast. Finally I found daily biases and MAPE.
