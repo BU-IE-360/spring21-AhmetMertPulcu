@@ -14,3 +14,8 @@
 + [Here](files/Ahmet_Mert_Pulçu_HW4.html) is the homework 4 html file.
 + [Here](files/Ahmet_Mert_Pulçu_HW4.Rmd) is the homework 4 Rmd file.
 + [Here](files/g13.xlsx) is the adjusted Trendyol data that we used in this assignment.
+## Project
++ [Here](files/Project.html) is the Project html file.
++ [Here](files/Project.Rmd) is the Project Rmd file.
++ [Here](files/Project.R) is the Project R Script file.
++ [Here](files/g13.xlsx) is the adjusted Trendyol data that we used in this assignment.
