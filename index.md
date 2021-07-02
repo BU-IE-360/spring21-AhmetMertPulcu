@@ -10,3 +10,7 @@
 ## Homework 3
 + [Here](files/Ahmet_Mert_Pulcu_HW3.html) is the homework 3 html file.
 + [Here](files/Ahmet_Mert_Pulcu_HW3.Rmd) is the homework 3 Rmd file.
+## Homework 4
++ [Here](files/Ahmet_Mert_Pulçu_HW4.html) is the homework 4 html file.
++ [Here](files/Ahmet_Mert_Pulçu_HW4.Rmd) is the homework 4 Rmd file.
++ [Here](files/g13.xlsx) is the adjusted Trendyol data that we used in this assignment.
